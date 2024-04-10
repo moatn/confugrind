@@ -36,14 +36,11 @@ def main():
         client.list_attachments_by_space(args.space, args.ext)
 
     #search confluance for keywords. 
-    if args.search and not args.space:
-        if not args.keyword:
-            parser.error("--search requires --keyword")
-        client.search_keywords_on_pages(args.keyword)
-
-    #search for keywords on specific spaces
-    if args.search and args.space:
-        client.search_keywords_on_pages(args.keyword, args.space)
+    if args.search and args.keyword:
+        if args.space:
+            client.search_keywords_on_pages(args.keyword, args.space)
+        else:
+            client.search_keywords_on_pages(args.keyword)
 
     #just list all the pages
     if args.list_spaces:
