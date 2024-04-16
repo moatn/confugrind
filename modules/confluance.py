@@ -34,7 +34,7 @@ class ConfluanceApiClient:
         
     def search_api_by_space(self, space, keyword):
         try:
-            response = self.r.get(f'{self.url}/rest/api/content/search?cql=space+~+{space}+and+text+~+"{keyword}"&limit=1000', headers=self.headers, proxies=self.proxy, verify=False)
+            response = self.r.get(f'{self.url}/rest/api/content/search?cql=space+=+{space}+and+text+~+"{keyword}"&limit=1000', headers=self.headers, proxies=self.proxy, verify=False)
             pages = self.create_dict_from_search(response.json())
             return pages
 
