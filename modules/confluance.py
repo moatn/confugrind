@@ -10,12 +10,12 @@ from urllib3.exceptions import InsecureRequestWarning
 urllib3.disable_warnings(InsecureRequestWarning)
 
 class ConfluanceApiClient:
-    def __init__(self, baseurl, token):
+    def __init__(self, baseurl, token, proxy):
         self.url = baseurl
         self.token = token
         self.proxy = {
-            "http":"http://127.0.0.1:8080",
-            "https":"http://127.0.0.1:8080"
+            "http": proxy,
+            "https": proxy
         }
         self.headers = {
             "Authorization": f"Bearer {token}" 

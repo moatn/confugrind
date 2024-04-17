@@ -49,6 +49,8 @@ python3 confugrind.py <baseurl> <token> [options]
 - `--sa`: Enable searching for attachments based on the specified `--ext`.
 - `--search`: Enable search through Confluence using CQL queries.
 - `--list-spaces`: List all available spaces in the Confluence instance.
+- `--logfile`: Specify a filename for the logger, default will do something like `1713346155_170424_confluance.log`
+- `--proxy`: Specify a proxy. Example: `--proxy http://127.0.0.1`.
 
 ### Examples
 
@@ -69,5 +71,4 @@ python3 confugrind.py <baseurl> <token> [options]
 
 ## Limitations and improvements
 - The current implementation does not handle all potential error scenarios
-- Add logger or logging format, or some sort of caching format
 - Add hail mary option to search all spaces, all pages for certain attachments

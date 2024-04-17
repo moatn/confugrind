@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
     parser.add_argument("--logfile", help="File to log to, default logfile 'DATEFORMAT_confluance.log'", default=f"{generate_log_filename()}")
+    parser.add_argument("--proxy", help="Set a proxy", default=None)
     parser.epilog="""
     Examples:
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-spaces
@@ -46,7 +47,7 @@ def main():
                         ])
     
     #setup the client
-    client = ConfluanceApiClient(args.baseurl, args.token)
+    client = ConfluanceApiClient(args.baseurl, args.token, args.proxy)
 
     #search attachments by space, with extensions
     if args.sa:
