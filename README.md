@@ -50,7 +50,7 @@ python3 confugrind.py <baseurl> <token> [options]
 - `--search`: Enable search through Confluence using CQL queries.
 - `--list-spaces`: List all available spaces in the Confluence instance.
 - `--logfile`: Specify a filename for the logger, default will do something like `1713346155_170424_confluance.log`
-- `--proxy`: Specify a proxy. Example: `--proxy http://127.0.0.1`.
+- `--proxy`: Specify a proxy. Example: `--proxy http://127.0.0.1:8080`.
 
 ### Examples
 
