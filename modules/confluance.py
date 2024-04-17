@@ -2,6 +2,7 @@ import requests
 import json
 import urllib3
 import re
+import logging
 from bs4 import BeautifulSoup
 from colorama import init, Fore, Back, Style
 from urllib3.exceptions import InsecureRequestWarning
@@ -20,6 +21,7 @@ class ConfluanceApiClient:
             "Authorization": f"Bearer {token}" 
         }
         self.r = requests.session()
+        logging.info("Initialized ConfluenceApiClient")
     
     def search_api(self, keyword):
         try:
@@ -62,9 +64,8 @@ class ConfluanceApiClient:
                     matches = re.findall(pattern, pretty_html, re.MULTILINE)
                     if matches:
                         for match in matches:
-                            print(Fore.GREEN + f'\nMatch found in: \n')
-                            print(Style.RESET_ALL)
-                            print(f'{page_info["_links"]["self"]}\n{self.url}{page_info["_links"]["webui"]}\n\n{match}')
+                            logging.info(Fore.GREEN + f'\nMatch found in:' + Style.RESET_ALL)
+                            logging.info(f'{page_info["_links"]["self"]}\n{self.url}{page_info["_links"]["webui"]}\n\n{match}')
 
         except requests.exceptions.HTTPError as http_err:
             return f"HTTP Error occurred: {http_err}"
@@ -82,7 +83,7 @@ class ConfluanceApiClient:
                     "name": space["name"],
                     "_links": space["_links"]
                 }
-            print(json.dumps(spaces, indent=4))
+            logging.info(json.dumps(spaces, indent=4))
             return spaces 
         except requests.exceptions.HTTPError as http_err:
             return f"HTTP Error occurred: {http_err}"
@@ -121,10 +122,10 @@ class ConfluanceApiClient:
             return attachments
 
         except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP Error occurred: {http_err}")
+            logging.info(f"HTTP Error occurred: {http_err}")
             return []
         except requests.exceptions.RequestException as err:
-            print(f"Error occurred: {err}")
+            logging.info(f"Error occurred: {err}")
             return []
         
     def list_attachments_by_space(self, space, ext):
@@ -132,8 +133,8 @@ class ConfluanceApiClient:
         for page_id, page_info in pages.items():
             attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"], ext)
             for attachment in attachments:
-                print(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
-                print(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                
+                logging.info(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
+                logging.info(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                
                         
     def search_keywords_on_pages(self, keyword, space=None):
         if space:

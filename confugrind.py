@@ -1,12 +1,20 @@
+import logging
 import requests
 import jsonify
 import json
+import datetime
 import argparse
 from argparse import RawTextHelpFormatter
 from modules.confluance import ConfluanceApiClient
 
 def comma_separated_list(arg):
     return arg.split(',')
+
+def generate_log_filename():
+    current_date = datetime.datetime.now()
+    date_str = "{0}_{1}".format(current_date.strftime('%s'), current_date.strftime('%d%m%y'))
+    filename = f"{date_str}_confluance.log"
+    return filename
 
 def main():
     parser = argparse.ArgumentParser(description="Confluance API client/ scraper", formatter_class=RawTextHelpFormatter)
@@ -18,17 +26,28 @@ def main():
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
-    parser.epilog="""\
+    parser.add_argument("--logfile", help="File to log to, default logfile 'DATEFORMAT_confluance.log'", default=f"{generate_log_filename()}")
+    parser.epilog="""
     Examples:
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-spaces
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
     """
+
     args = parser.parse_args()
+
+    #setup logging
+    logging.basicConfig(level=logging.INFO,
+                        format='%(message)s',
+                        handlers=[
+                            logging.FileHandler(args.logfile),
+                            logging.StreamHandler()
+                        ])
+    
+    #setup the client
     client = ConfluanceApiClient(args.baseurl, args.token)
 
-    
     #search attachments by space, with extensions
     if args.sa:
         if not args.space or not args.ext:
@@ -46,6 +65,8 @@ def main():
     if args.list_spaces:
         client.list_spaces()
 
-
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(F"An error occurred: {e}")
