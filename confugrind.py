@@ -33,6 +33,7 @@ def main():
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-spaces
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
     """
 
@@ -51,9 +52,15 @@ def main():
 
     #search attachments by space, with extensions
     if args.sa:
-        if not args.space or not args.ext:
+        #if not args.space or not args.ext:
+        if not args.ext:
             parser.error("--sa requires --space and --ext options")
-        client.list_attachments_by_space(args.space, args.ext)
+
+        if args.space:
+            client.list_attachments_by_space(args.space, args.ext)
+        else:
+            client.list_attachments_all(args.ext)
+        #client.list_attachments_by_space(args.space, args.ext)
 
     #search confluance for keywords. 
     if args.search and args.keyword:

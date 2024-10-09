@@ -90,7 +90,6 @@ class ConfluanceApiClient:
         except requests.exceptions.RequestException as err:
             return f"Error occurred: {err}"         
 
-
     def list_pages_by_space(self, key):
         try:
             response = self.r.get(f"{self.url}/rest/api/content?spaceKey={key}&limit=1000", headers=self.headers, proxies=self.proxy, verify=False)
@@ -127,6 +126,19 @@ class ConfluanceApiClient:
         except requests.exceptions.RequestException as err:
             logging.info(f"Error occurred: {err}")
             return []
+    
+    def list_attachments_all(self, ext):
+        spaces = self.list_spaces()
+        for space_id, space_details in spaces.items():
+            key = space_details.get("key")
+            if key:
+                pages = self.list_pages_by_space(key)
+                for page_id, page_info in pages.items():
+                    attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"], ext)
+                    for attachment in attachments:
+                        logging.info(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
+                        logging.info(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                       
+
         
     def list_attachments_by_space(self, space, ext):
         pages = self.list_pages_by_space(space)
