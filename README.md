@@ -8,6 +8,7 @@ This Python-based tool (`confugrind.py`) serves as a client for interacting with
 - List all spaces in the Confluence instance.
 - Fetch attachments from specified spaces with desired file extensions.
 - Optional functionality to search for attachments related to specific keywords.
+- Download all keyword-matching pages and their attachments to disk.
 
 ## Requirements
 - Python 3.x
@@ -49,6 +50,7 @@ python3 confugrind.py <baseurl> <token> [options]
 - `--sa`: Enable searching for attachments based on the specified `--ext`.
 - `--search`: Enable search through Confluence using CQL queries.
 - `--list-spaces`: List all available spaces in the Confluence instance.
+- `--download`: Download keyword-matching pages and all attachments to the provided local directory (requires `--search` and `--keyword`).
 - `--logfile`: Specify a filename for the logger, default will do something like `1713346155_170424_confluance.log`
 - `--proxy`: Specify a proxy. Example: `--proxy http://127.0.0.1:8080`.
 
@@ -68,6 +70,23 @@ python3 confugrind.py <baseurl> <token> [options]
   ```bash
   python3 confugrind.py https://some-confluence.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
   ```
+
+- **Download all pages (and their attachments) that match a keyword:**
+  ```bash
+  python3 confugrind.py https://some-confluence.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword password --download ./loot
+  ```
+
+### Download Output Structure
+
+When `--download` is used, each matched page is stored in a dedicated folder named `<page_id>_<page_title>`.
+
+```text
+./loot/
+  <page_id>_<page_title>/
+    page.html
+    attachments/
+      <attachment files>
+```
 
 ## Limitations and improvements
 - The current implementation does not handle all potential error scenarios

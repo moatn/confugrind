@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
+    parser.add_argument("--download", help="Directory to download keyword-matching pages and all attachments (requires --search and --keyword)")
     parser.add_argument("--logfile", help="File to log to, default logfile 'DATEFORMAT_confluance.log'", default=f"{generate_log_filename()}")
     parser.add_argument("--proxy", help="Set a proxy", default=None)
     parser.epilog="""
@@ -33,11 +34,15 @@ def main():
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-spaces
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --download ./loot
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
     """
 
     args = parser.parse_args()
+
+    if args.download and not (args.search and args.keyword):
+        parser.error("--download requires --search and --keyword")
 
     #setup logging
     logging.basicConfig(level=logging.INFO,
@@ -65,9 +70,9 @@ def main():
     #search confluance for keywords. 
     if args.search and args.keyword:
         if args.space:
-            client.search_keywords_on_pages(args.keyword, args.space)
+            client.search_keywords_on_pages(args.keyword, args.space, args.download)
         else:
-            client.search_keywords_on_pages(args.keyword)
+            client.search_keywords_on_pages(args.keyword, download_dir=args.download)
 
     #just list all the pages
     if args.list_spaces:

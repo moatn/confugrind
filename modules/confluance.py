@@ -3,6 +3,7 @@ import json
 import urllib3
 import re
 import logging
+import os
 from bs4 import BeautifulSoup
 from colorama import init, Fore, Back, Style
 from urllib3.exceptions import InsecureRequestWarning
@@ -50,9 +51,54 @@ class ConfluanceApiClient:
         for page in data["results"]:
             pages[page["id"]] = {"title": page["title"], "_links": page["_links"]}
         return pages
+
+    def sanitize_filename(self, value):
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "_", value).strip().strip(".")
+        if not cleaned:
+            return "untitled"
+        return cleaned[:150]
+
+    def unique_filepath(self, directory, filename):
+        base, ext = os.path.splitext(filename)
+        candidate = filename
+        counter = 1
+        while os.path.exists(os.path.join(directory, candidate)):
+            candidate = f"{base}_{counter}{ext}"
+            counter += 1
+        return os.path.join(directory, candidate)
+
+    def download_attachment_file(self, url, output_path):
+        response = self.r.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True)
+        response.raise_for_status()
+        with open(output_path, "wb") as output_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    output_file.write(chunk)
+
+    def download_page_and_attachments(self, page_id, page_info, page_body, output_dir):
+        page_title = page_info.get("title", page_id)
+        page_folder_name = f"{page_id}_{self.sanitize_filename(page_title)}"
+        page_folder_path = os.path.join(output_dir, page_folder_name)
+        attachments_folder_path = os.path.join(page_folder_path, "attachments")
+        os.makedirs(attachments_folder_path, exist_ok=True)
+
+        page_html_path = os.path.join(page_folder_path, "page.html")
+        with open(page_html_path, "w", encoding="utf-8") as html_file:
+            html_file.write(page_body)
+        logging.info(f"Saved page: {page_html_path}")
+
+        attachments = self.list_attachments(page_id, page_title, self.url + page_info["_links"]["webui"])
+        for attachment in attachments:
+            safe_name = self.sanitize_filename(attachment["title"])
+            attachment_path = self.unique_filepath(attachments_folder_path, safe_name)
+            try:
+                self.download_attachment_file(attachment["url"], attachment_path)
+                logging.info(f"Saved attachment: {attachment_path}")
+            except requests.exceptions.RequestException as err:
+                logging.info(f"Failed to download attachment '{attachment['title']}': {err}")
     
-    def grep_content_page(self, data, keyword):
-        pattern = rf'^.*(?:{keyword}).*$'
+    def grep_content_page(self, data, keyword, download_dir=None):
+        pattern = rf'^.*(?:{re.escape(keyword)}).*$'
         try:
             #   key, value
             for page_id, page_info in data.items():
@@ -61,11 +107,13 @@ class ConfluanceApiClient:
                     pageBody = response.json()["body"]["view"]["value"]
                     soup = BeautifulSoup(pageBody, 'html.parser')
                     pretty_html = soup.prettify()
-                    matches = re.findall(pattern, pretty_html, re.MULTILINE)
+                    matches = re.findall(pattern, pretty_html, re.MULTILINE | re.IGNORECASE)
                     if matches:
                         for match in matches:
                             logging.info(Fore.GREEN + f'\nMatch found in:' + Style.RESET_ALL)
                             logging.info(f'{page_info["_links"]["self"]}\n{self.url}{page_info["_links"]["webui"]}\n\n{match}')
+                    if download_dir:
+                        self.download_page_and_attachments(page_id, page_info, pageBody, download_dir)
 
         except requests.exceptions.HTTPError as http_err:
             return f"HTTP Error occurred: {http_err}"
@@ -109,15 +157,20 @@ class ConfluanceApiClient:
             response = self.r.get(f"{self.url}/rest/api/content/{page_id}/child/attachment", headers=self.headers, proxies=self.proxy, verify=False)
             data = response.json()["results"]
 
+            allowed_extensions = None
+            if ext:
+                allowed_extensions = {extension.lower() for extension in ext}
+
             attachments = []
             for attachment in data:
                 extension = attachment["extensions"]["mediaType"].split('/')[-1]
-                if extension.lower() in ext:
-                    attachment_info = {
-                        "title": attachment["title"],
-                        "url": self.url + attachment["_links"]["download"]
-                    }
-                    attachments.append(attachment_info)
+                if allowed_extensions and extension.lower() not in allowed_extensions:
+                    continue
+                attachment_info = {
+                    "title": attachment["title"],
+                    "url": self.url + attachment["_links"]["download"]
+                }
+                attachments.append(attachment_info)
             return attachments
 
         except requests.exceptions.HTTPError as http_err:
@@ -148,13 +201,20 @@ class ConfluanceApiClient:
                 logging.info(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
                 logging.info(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                
                         
-    def search_keywords_on_pages(self, keyword, space=None):
+    def search_keywords_on_pages(self, keyword, space=None, download_dir=None):
         if space:
             pages = self.search_api_by_space(space, keyword)
         else:
             pages = self.search_api(keyword)
-        self.grep_content_page(pages, keyword)
+
+        if not isinstance(pages, dict):
+            logging.info(pages)
+            return
+
+        if download_dir:
+            os.makedirs(download_dir, exist_ok=True)
+            logging.info(f"Downloading keyword matches to: {os.path.abspath(download_dir)}")
+
+        self.grep_content_page(pages, keyword, download_dir=download_dir)
         
-
-
 
