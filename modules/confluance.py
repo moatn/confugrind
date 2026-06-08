@@ -4,6 +4,7 @@ import urllib3
 import re
 import logging
 import os
+import fnmatch
 from bs4 import BeautifulSoup
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -217,8 +218,24 @@ class ConfluanceApiClient:
                 logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
                 logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
 
-    def list_all_attachments_in_space(self, space):
+    def _matches_name_filter(self, title, include, exclude):
+        name = title.lower()
+        if include and not any(fnmatch.fnmatch(name, p.lower()) for p in include):
+            return False
+        if exclude and any(fnmatch.fnmatch(name, p.lower()) for p in exclude):
+            return False
+        return True
+
+    def list_all_attachments_in_space(self, space, include=None, exclude=None, output_dir=None):
         logging.info(f'\n{C.BOLD}Listing all attachments in space: {space}{C.RESET}')
+        if include:
+            logging.info(f'  {C.GREY}include: {", ".join(include)}{C.RESET}')
+        if exclude:
+            logging.info(f'  {C.GREY}exclude: {", ".join(exclude)}{C.RESET}')
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+            logging.info(f'  {C.GREY}output:  {os.path.abspath(output_dir)}{C.RESET}')
+
         pages = self.list_pages_by_space(space)
         if not pages:
             logging.info(f'  {C.RED}x No pages found in space \'{space}\'{C.RESET}')
@@ -227,12 +244,25 @@ class ConfluanceApiClient:
         total = 0
         for page_id, page_info in pages.items():
             attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"])
-            if attachments:
+            filtered = [a for a in attachments if self._matches_name_filter(a["title"], include, exclude)]
+            if filtered:
                 logging.info(f'\n  {C.CYAN}{page_info["title"]}{C.RESET}')
                 logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
-                for attachment in attachments:
+
+                if output_dir:
+                    page_folder = os.path.join(output_dir, f"{page_id}_{self.sanitize_filename(page_info['title'])}", "attachments")
+                    os.makedirs(page_folder, exist_ok=True)
+
+                for attachment in filtered:
                     logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
                     logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
+                    if output_dir:
+                        dest = self.unique_filepath(page_folder, self.sanitize_filename(attachment["title"]))
+                        try:
+                            self.download_attachment_file(attachment["url"], dest)
+                            logging.info(f'    {C.GREEN}[Saved]{C.RESET} {dest}')
+                        except requests.exceptions.RequestException as err:
+                            logging.info(f'    {C.RED}x Failed to download \'{attachment["title"]}\': {err}{C.RESET}')
                     total += 1
 
         logging.info(f'\n  {C.GREEN}Total attachments found: {total}{C.RESET}')

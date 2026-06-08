@@ -27,6 +27,9 @@ def main():
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
     parser.add_argument("--list-space-attachments", dest="list_space_attachments", metavar="SPACE_KEY", help="List all attachments in a given space (no extension filter required)")
+    parser.add_argument("--include-name", type=comma_separated_list, dest="include_name", metavar="PATTERN", help="Only show attachments whose filename matches any of these glob patterns (e.g. '*.pdf,password*')")
+    parser.add_argument("--exclude-name", type=comma_separated_list, dest="exclude_name", metavar="PATTERN", help="Skip attachments whose filename matches any of these glob patterns (e.g. '*.png,*.jpg')")
+    parser.add_argument("--output", metavar="DIR", help="Download attachments from --list-space-attachments to this directory")
     parser.add_argument("--download", help="Directory to download keyword-matching pages and all attachments (requires --search and --keyword)")
     parser.add_argument("--logfile", help="File to log to, default logfile 'DATEFORMAT_confluance.log'", default=f"{generate_log_filename()}")
     parser.add_argument("--proxy", help="Set a proxy", default=None)
@@ -39,6 +42,9 @@ def main():
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT --include-name '*.pdf,*.docx'
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT --exclude-name '*.png,*.jpg,*.gif'
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT --include-name '*.pdf,*.docx' --output ./loot
     """
 
     args = parser.parse_args()
@@ -78,7 +84,7 @@ def main():
 
     #list all attachments in a space (no ext filter)
     if args.list_space_attachments:
-        client.list_all_attachments_in_space(args.list_space_attachments)
+        client.list_all_attachments_in_space(args.list_space_attachments, args.include_name, args.exclude_name, args.output)
 
     #just list all the pages
     if args.list_spaces:
