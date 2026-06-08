@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
+    parser.add_argument("--list-space-attachments", dest="list_space_attachments", metavar="SPACE_KEY", help="List all attachments in a given space (no extension filter required)")
     parser.add_argument("--download", help="Directory to download keyword-matching pages and all attachments (requires --search and --keyword)")
     parser.add_argument("--logfile", help="File to log to, default logfile 'DATEFORMAT_confluance.log'", default=f"{generate_log_filename()}")
     parser.add_argument("--proxy", help="Set a proxy", default=None)
@@ -37,6 +38,7 @@ def main():
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --download ./loot
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT
     """
 
     args = parser.parse_args()
@@ -73,6 +75,10 @@ def main():
             client.search_keywords_on_pages(args.keyword, args.space, args.download)
         else:
             client.search_keywords_on_pages(args.keyword, download_dir=args.download)
+
+    #list all attachments in a space (no ext filter)
+    if args.list_space_attachments:
+        client.list_all_attachments_in_space(args.list_space_attachments)
 
     #just list all the pages
     if args.list_spaces:

@@ -175,3 +175,19 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+### AI Agents ###
+.claude/
+.cursor/
+.copilot/
+.github/copilot/
+.aider*
+.aider.tags.cache.v*/
+.continue/
+.codeium/
+.tabnine/
+.windsurferrules
+.windsurf/
+.qodo/
+CLAUDE.md
+*.cursorrules

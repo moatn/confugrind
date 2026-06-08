@@ -5,10 +5,19 @@ import re
 import logging
 import os
 from bs4 import BeautifulSoup
-from colorama import init, Fore, Back, Style
 from urllib3.exceptions import InsecureRequestWarning
 
 urllib3.disable_warnings(InsecureRequestWarning)
+
+
+class C:
+    BOLD   = "\033[1m"
+    CYAN   = "\033[96m"
+    GREEN  = "\033[92m"
+    YELLOW = "\033[93m"
+    GREY   = "\033[90m"
+    RED    = "\033[91m"
+    RESET  = "\033[0m"
 
 class ConfluanceApiClient:
     def __init__(self, baseurl, token, proxy):
@@ -110,8 +119,10 @@ class ConfluanceApiClient:
                     matches = re.findall(pattern, pretty_html, re.MULTILINE | re.IGNORECASE)
                     if matches:
                         for match in matches:
-                            logging.info(Fore.GREEN + f'\nMatch found in:' + Style.RESET_ALL)
-                            logging.info(f'{page_info["_links"]["self"]}\n{self.url}{page_info["_links"]["webui"]}\n\n{match}')
+                            logging.info(f'{C.GREEN}[+] Match found in:{C.RESET}')
+                            logging.info(f'{C.CYAN}[Page]{C.RESET} {page_info["_links"]["self"]}')
+                            logging.info(f'{C.GREY}[URL]  {self.url}{page_info["_links"]["webui"]}{C.RESET}')
+                            logging.info(f'{C.YELLOW}[Hit]{C.RESET}  {match}')
                     if download_dir:
                         self.download_page_and_attachments(page_id, page_info, pageBody, download_dir)
 
@@ -131,8 +142,10 @@ class ConfluanceApiClient:
                     "name": space["name"],
                     "_links": space["_links"]
                 }
-            logging.info(json.dumps(spaces, indent=4))
-            return spaces 
+            logging.info(f'\n{C.BOLD}[*] Spaces found:{C.RESET}')
+            for sid, s in spaces.items():
+                logging.info(f'  {C.CYAN}[Space]{C.RESET} {s["name"]}  {C.YELLOW}[Key]{C.RESET} {s["key"]}')
+            return spaces
         except requests.exceptions.HTTPError as http_err:
             return f"HTTP Error occurred: {http_err}"
         except requests.exceptions.RequestException as err:
@@ -189,17 +202,40 @@ class ConfluanceApiClient:
                 for page_id, page_info in pages.items():
                     attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"], ext)
                     for attachment in attachments:
-                        logging.info(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
-                        logging.info(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                       
+                        logging.info(f'\n  {C.CYAN}{page_info["title"]}{C.RESET}')
+                        logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
+                        logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
+                        logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
 
-        
     def list_attachments_by_space(self, space, ext):
         pages = self.list_pages_by_space(space)
         for page_id, page_info in pages.items():
             attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"], ext)
             for attachment in attachments:
-                logging.info(f"\nPage name: {page_info['title']}\nURL: {self.url + page_info['_links']['webui']}")
-                logging.info(f"Attachment: {attachment['title']}\nURL: {attachment['url']}\n")                
+                logging.info(f'\n  {C.CYAN}{page_info["title"]}{C.RESET}')
+                logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
+                logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
+                logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
+
+    def list_all_attachments_in_space(self, space):
+        logging.info(f'\n{C.BOLD}Listing all attachments in space: {space}{C.RESET}')
+        pages = self.list_pages_by_space(space)
+        if not pages:
+            logging.info(f'  {C.RED}x No pages found in space \'{space}\'{C.RESET}')
+            return
+
+        total = 0
+        for page_id, page_info in pages.items():
+            attachments = self.list_attachments(page_id, page_info["title"], self.url + page_info["_links"]["webui"])
+            if attachments:
+                logging.info(f'\n  {C.CYAN}{page_info["title"]}{C.RESET}')
+                logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
+                for attachment in attachments:
+                    logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
+                    logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
+                    total += 1
+
+        logging.info(f'\n  {C.GREEN}Total attachments found: {total}{C.RESET}')
                         
     def search_keywords_on_pages(self, keyword, space=None, download_dir=None):
         if space:
