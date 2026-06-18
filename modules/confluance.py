@@ -210,30 +210,40 @@ class ConfluanceApiClient:
             logging.info(f"Error occurred while listing attachments for {page_id}: {err}")
             return []
 
-    def download_attachment_versions(self, page_id, page_info, output_dir):
+    def download_attachment_versions(self, page_id, page_info, output_dir,
+                                     include=None, exclude=None, history=True):
         attachments = self.list_attachment_versions(page_id)
         if not attachments:
-            return
+            return 0
+        attachments = [a for a in attachments if self._matches_name_filter(a["title"], include, exclude)]
+        if not attachments:
+            return 0
+
         title = page_info.get("title", page_id)
         page_folder = os.path.join(output_dir, f"{page_id}_{self.sanitize_filename(title)}")
         attachments_folder = os.path.join(page_folder, "attachments")
         os.makedirs(attachments_folder, exist_ok=True)
 
+        count = 0
         for attachment in attachments:
             name = attachment["title"]
             base, ext = os.path.splitext(name)
             #_links.download is a relative path with a query string; keep the
             # path and swap in the version we want.
             path_part = attachment["download"].split("?", 1)[0]
-            for version in range(1, attachment["current_version"] + 1):
+            current = attachment["current_version"]
+            versions = range(1, current + 1) if history else [current]
+            for version in versions:
                 url = f"{self.url}{path_part}?version={version}"
                 safe_name = self.sanitize_filename(f"{base}_v{version}{ext}")
                 dest = self.unique_filepath(attachments_folder, safe_name)
                 try:
                     self.download_attachment_file(url, dest)
                     logging.info(f'    {C.GREEN}[Saved]{C.RESET} {dest}')
+                    count += 1
                 except requests.exceptions.RequestException as err:
                     logging.info(f'    {C.RED}x Failed v{version} of \'{name}\': {err}{C.RESET}')
+        return count
 
     def grep_page_history(self, page_id, page_info, keyword, download_dir=None):
         pattern = rf'^.*(?:{re.escape(keyword)}).*$'
@@ -398,7 +408,7 @@ class ConfluanceApiClient:
             return False
         return True
 
-    def list_all_attachments_in_space(self, space, include=None, exclude=None, output_dir=None):
+    def list_all_attachments_in_space(self, space, include=None, exclude=None, output_dir=None, history=True):
         logging.info(f'\n{C.BOLD}Listing all attachments in space: {space}{C.RESET}')
         if include:
             logging.info(f'  {C.GREY}include: {", ".join(include)}{C.RESET}')
@@ -407,6 +417,7 @@ class ConfluanceApiClient:
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
             logging.info(f'  {C.GREY}output:  {os.path.abspath(output_dir)}{C.RESET}')
+            logging.info(f'  {C.GREY}history: {"all versions" if history else "current only"}{C.RESET}')
 
         pages = self.list_pages_by_space(space)
         if not pages:
@@ -421,21 +432,15 @@ class ConfluanceApiClient:
                 logging.info(f'\n  {C.CYAN}{page_info["title"]}{C.RESET}')
                 logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
 
-                if output_dir:
-                    page_folder = os.path.join(output_dir, f"{page_id}_{self.sanitize_filename(page_info['title'])}", "attachments")
-                    os.makedirs(page_folder, exist_ok=True)
-
                 for attachment in filtered:
                     logging.info(f'    {C.YELLOW}[Attachment]{C.RESET} {attachment["title"]}')
                     logging.info(f'    {C.GREY}{attachment["url"]}{C.RESET}')
-                    if output_dir:
-                        dest = self.unique_filepath(page_folder, self.sanitize_filename(attachment["title"]))
-                        try:
-                            self.download_attachment_file(attachment["url"], dest)
-                            logging.info(f'    {C.GREEN}[Saved]{C.RESET} {dest}')
-                        except requests.exceptions.RequestException as err:
-                            logging.info(f'    {C.RED}x Failed to download \'{attachment["title"]}\': {err}{C.RESET}')
                     total += 1
+
+                if output_dir:
+                    self.download_attachment_versions(
+                        page_id, page_info, output_dir,
+                        include=include, exclude=exclude, history=history)
 
         logging.info(f'\n  {C.GREEN}Total attachments found: {total}{C.RESET}')
                         

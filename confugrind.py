@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--ext", type=comma_separated_list, help="comma seperated extensions to look for on pages")
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
-    parser.add_argument("--no-history", dest="no_history", action="store_true", help="Only search the current version of pages. By default --search also scans previous versions (catches secrets removed from the current version)")
+    parser.add_argument("--no-history", dest="no_history", action="store_true", help="Restrict to current versions only. By default --search scans previous page versions, and --list-space-attachments downloads every version of each attachment (catches content removed from the live page)")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
     parser.add_argument("--list-space-urls", dest="list_space_urls", metavar="SPACE_KEY", help="List all page URLs in a given space")
     parser.add_argument("--list-space-attachments", dest="list_space_attachments", metavar="SPACE_KEY", help="List all attachments in a given space (no extension filter required)")
@@ -87,9 +87,10 @@ def main():
             #history scan greps every version (incl. current) of all pages in scope
             client.search_history(args.keyword, args.space, args.download)
 
-    #list all attachments in a space (no ext filter)
+    #list all attachments in a space (no ext filter). downloads all versions
+    #unless --no-history is set
     if args.list_space_attachments:
-        client.list_all_attachments_in_space(args.list_space_attachments, args.include_name, args.exclude_name, args.output)
+        client.list_all_attachments_in_space(args.list_space_attachments, args.include_name, args.exclude_name, args.output, history=not args.no_history)
 
     #list all page URLs in a space
     if args.list_space_urls:
