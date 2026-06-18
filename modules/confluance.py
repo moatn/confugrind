@@ -132,23 +132,34 @@ class ConfluanceApiClient:
         except requests.exceptions.RequestException as err:
             return f"Error occurred: {err}"
         
-    def list_page_versions(self, page_id):
+    def _json_or_log(self, response, context):
         try:
-            versions = []
-            start = 0
-            limit = 100
-            while True:
-                response = self.r.get(
-                    f"{self.url}/rest/api/content/{page_id}/version?limit={limit}&start={start}",
-                    headers=self.headers, proxies=self.proxy, verify=False)
-                results = response.json().get("results", [])
-                for version in results:
-                    versions.append(version["number"])
-                if len(results) < limit:
-                    break
-                start += limit
-            return versions
-        except (requests.exceptions.RequestException, ValueError, KeyError) as err:
+            return response.json()
+        except ValueError:
+            snippet = response.text[:200].replace("\n", " ")
+            logging.info(
+                f"{C.RED}x {context}: non-JSON response "
+                f"(HTTP {response.status_code}) {snippet!r}{C.RESET}")
+            return None
+
+    def list_page_versions(self, page_id):
+        # Read the current version number from the page itself and iterate
+        # 1..current. More portable than the /version child endpoint, which
+        # is inconsistent across Confluence Server/DC/Cloud.
+        try:
+            response = self.r.get(
+                f"{self.url}/rest/api/content/{page_id}?expand=version",
+                headers={**self.headers, "Accept": "application/json"},
+                proxies=self.proxy, verify=False)
+            data = self._json_or_log(response, f"listing versions for {page_id}")
+            if not data:
+                return []
+            current = data.get("version", {}).get("number")
+            if not current:
+                logging.info(f"{C.RED}x No version info for {page_id}{C.RESET}")
+                return []
+            return list(range(1, current + 1))
+        except requests.exceptions.RequestException as err:
             logging.info(f"Error occurred while listing versions for {page_id}: {err}")
             return []
 
@@ -157,9 +168,13 @@ class ConfluanceApiClient:
             status = "&status=historical" if historical else ""
             response = self.r.get(
                 f"{self.url}/rest/api/content/{page_id}?version={version}{status}&expand=body.view",
-                headers=self.headers, proxies=self.proxy, verify=False)
-            return response.json()["body"]["view"]["value"]
-        except (requests.exceptions.RequestException, ValueError, KeyError) as err:
+                headers={**self.headers, "Accept": "application/json"},
+                proxies=self.proxy, verify=False)
+            data = self._json_or_log(response, f"fetching version {version} of {page_id}")
+            if not data:
+                return None
+            return data["body"]["view"]["value"]
+        except (requests.exceptions.RequestException, KeyError) as err:
             logging.info(f"Error occurred while fetching version {version} of {page_id}: {err}")
             return None
 
