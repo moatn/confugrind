@@ -1,6 +1,5 @@
 import logging
 import requests
-import jsonify
 import json
 import datetime
 import argparse
@@ -25,7 +24,9 @@ def main():
     parser.add_argument("--ext", type=comma_separated_list, help="comma seperated extensions to look for on pages")
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
     parser.add_argument("--search", action="store_true", help="Search confluance trough CQL queries")
+    parser.add_argument("--no-history", dest="no_history", action="store_true", help="Only search the current version of pages. By default --search also scans previous versions (catches secrets removed from the current version)")
     parser.add_argument("--list-spaces", action="store_true", help="List all spaces and keys")
+    parser.add_argument("--list-space-urls", dest="list_space_urls", metavar="SPACE_KEY", help="List all page URLs in a given space")
     parser.add_argument("--list-space-attachments", dest="list_space_attachments", metavar="SPACE_KEY", help="List all attachments in a given space (no extension filter required)")
     parser.add_argument("--include-name", type=comma_separated_list, dest="include_name", metavar="PATTERN", help="Only show attachments whose filename matches any of these glob patterns (e.g. '*.pdf,password*')")
     parser.add_argument("--exclude-name", type=comma_separated_list, dest="exclude_name", metavar="PATTERN", help="Skip attachments whose filename matches any of these glob patterns (e.g. '*.png,*.jpg')")
@@ -36,9 +37,12 @@ def main():
     parser.epilog="""
     Examples:
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-spaces
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-urls IT
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --download ./loot
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --no-history
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT --download ./loot
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --space IT --ext pdf,docx,txt,kdb
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --list-space-attachments IT
@@ -75,16 +79,21 @@ def main():
             client.list_attachments_all(args.ext)
         #client.list_attachments_by_space(args.space, args.ext)
 
-    #search confluance for keywords. 
+    #search confluance for keywords. by default this also greps page history
     if args.search and args.keyword:
-        if args.space:
+        if args.no_history:
             client.search_keywords_on_pages(args.keyword, args.space, args.download)
         else:
-            client.search_keywords_on_pages(args.keyword, download_dir=args.download)
+            #history scan greps every version (incl. current) of all pages in scope
+            client.search_history(args.keyword, args.space, args.download)
 
     #list all attachments in a space (no ext filter)
     if args.list_space_attachments:
         client.list_all_attachments_in_space(args.list_space_attachments, args.include_name, args.exclude_name, args.output)
+
+    #list all page URLs in a space
+    if args.list_space_urls:
+        client.list_urls_by_space(args.list_space_urls)
 
     #just list all the pages
     if args.list_spaces:

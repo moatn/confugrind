@@ -132,6 +132,97 @@ class ConfluanceApiClient:
         except requests.exceptions.RequestException as err:
             return f"Error occurred: {err}"
         
+    def list_page_versions(self, page_id):
+        try:
+            versions = []
+            start = 0
+            limit = 100
+            while True:
+                response = self.r.get(
+                    f"{self.url}/rest/api/content/{page_id}/version?limit={limit}&start={start}",
+                    headers=self.headers, proxies=self.proxy, verify=False)
+                results = response.json().get("results", [])
+                for version in results:
+                    versions.append(version["number"])
+                if len(results) < limit:
+                    break
+                start += limit
+            return versions
+        except (requests.exceptions.RequestException, ValueError, KeyError) as err:
+            logging.info(f"Error occurred while listing versions for {page_id}: {err}")
+            return []
+
+    def get_page_body_at_version(self, page_id, version, historical=True):
+        try:
+            status = "&status=historical" if historical else ""
+            response = self.r.get(
+                f"{self.url}/rest/api/content/{page_id}?version={version}{status}&expand=body.view",
+                headers=self.headers, proxies=self.proxy, verify=False)
+            return response.json()["body"]["view"]["value"]
+        except (requests.exceptions.RequestException, ValueError, KeyError) as err:
+            logging.info(f"Error occurred while fetching version {version} of {page_id}: {err}")
+            return None
+
+    def save_page_version(self, page_id, page_info, version, body, output_dir):
+        title = page_info.get("title", page_id)
+        page_folder = os.path.join(output_dir, f"{page_id}_{self.sanitize_filename(title)}")
+        os.makedirs(page_folder, exist_ok=True)
+        path = os.path.join(page_folder, f"v{version}.html")
+        with open(path, "w", encoding="utf-8") as html_file:
+            html_file.write(body)
+        logging.info(f'    {C.GREEN}[Saved]{C.RESET} {path}')
+
+    def grep_page_history(self, page_id, page_info, keyword, download_dir=None):
+        pattern = rf'^.*(?:{re.escape(keyword)}).*$'
+        versions = self.list_page_versions(page_id)
+        if not versions:
+            return
+        current = max(versions)
+        title = page_info.get("title", page_id)
+        webui = page_info.get("_links", {}).get("webui", "")
+        for version in sorted(versions):
+            body = self.get_page_body_at_version(page_id, version, historical=(version != current))
+            if body is None:
+                continue
+            soup = BeautifulSoup(body, 'html.parser')
+            pretty_html = soup.prettify()
+            matches = re.findall(pattern, pretty_html, re.MULTILINE | re.IGNORECASE)
+            if matches:
+                tag = "current" if version == current else "history"
+                for match in matches:
+                    logging.info(f'{C.GREEN}[+] Match found in {tag}:{C.RESET}')
+                    logging.info(f'{C.CYAN}[Page]{C.RESET} {title} {C.GREY}(v{version}){C.RESET}')
+                    logging.info(f'{C.GREY}[URL]  {self.url}{webui}{C.RESET}')
+                    logging.info(f'{C.YELLOW}[Hit]{C.RESET}  {match}')
+                if download_dir:
+                    self.save_page_version(page_id, page_info, version, body, download_dir)
+
+    def search_history(self, keyword, space=None, download_dir=None):
+        if space:
+            pages = self.list_pages_by_space(space)
+        else:
+            pages = {}
+            spaces = self.list_spaces()
+            if isinstance(spaces, dict):
+                for space_id, space_details in spaces.items():
+                    key = space_details.get("key")
+                    if key:
+                        space_pages = self.list_pages_by_space(key)
+                        if isinstance(space_pages, dict):
+                            pages.update(space_pages)
+
+        if not isinstance(pages, dict) or not pages:
+            logging.info(f'{C.RED}x No pages found to scan history{C.RESET}')
+            return
+
+        if download_dir:
+            os.makedirs(download_dir, exist_ok=True)
+            logging.info(f"Downloading history matches to: {os.path.abspath(download_dir)}")
+
+        logging.info(f'\n{C.BOLD}Scanning page history ({len(pages)} pages) for keyword: {keyword}{C.RESET}')
+        for page_id, page_info in pages.items():
+            self.grep_page_history(page_id, page_info, keyword, download_dir=download_dir)
+
     def list_spaces(self):
         try:
             response = self.r.get(f"{self.url}/rest/api/space?limit=1000", headers=self.headers, proxies=self.proxy, verify=False)
@@ -165,6 +256,19 @@ class ConfluanceApiClient:
             return f"HTTP Error occurred: {http_err}"
         except requests.exceptions.RequestException as err:
             return f"Error occurred: {err}"  
+
+    def list_urls_by_space(self, space):
+        logging.info(f'\n{C.BOLD}Listing all page URLs in space: {space}{C.RESET}')
+        pages = self.list_pages_by_space(space)
+        if not pages:
+            logging.info(f'  {C.RED}x No pages found in space \'{space}\'{C.RESET}')
+            return
+
+        for page_id, page_info in pages.items():
+            logging.info(f'  {C.CYAN}{page_info["title"]}{C.RESET}')
+            logging.info(f'  {C.GREY}{self.url + page_info["_links"]["webui"]}{C.RESET}')
+
+        logging.info(f'\n  {C.GREEN}Total pages: {len(pages)}{C.RESET}')
 
     def list_attachments(self, page_id, page_title, page_url, ext=None):
         try:
