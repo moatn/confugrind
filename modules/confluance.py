@@ -34,9 +34,27 @@ class ConfluanceApiClient:
         self.r = requests.session()
         logging.info("Initialized ConfluenceApiClient")
     
-    def search_api(self, keyword):
+    def _as_keyword_list(self, keywords):
+        #accept a single string or a list of keywords
+        if isinstance(keywords, str):
+            return [keywords]
+        return list(keywords)
+
+    def _build_text_cql(self, keywords):
+        #OR semantics: a page matches if it contains any keyword
+        return "(" + " OR ".join(f'text ~ "{k}"' for k in keywords) + ")"
+
+    def _keyword_pattern(self, keywords):
+        alternation = "|".join(re.escape(k) for k in keywords)
+        return rf'^.*(?:{alternation}).*$'
+
+    def search_api(self, keywords):
+        keywords = self._as_keyword_list(keywords)
         try:
-            response = self.r.get(f'{self.url}/rest/api/content/search?cql=text+~+"{keyword}"&limit=1000', headers=self.headers, proxies=self.proxy, verify=False)
+            response = self.r.get(
+                f'{self.url}/rest/api/content/search',
+                params={"cql": self._build_text_cql(keywords), "limit": 1000},
+                headers=self.headers, proxies=self.proxy, verify=False)
             pages = self.create_dict_from_search(response.json())
             return pages
 
@@ -44,17 +62,21 @@ class ConfluanceApiClient:
             return f"HTTP Error occurred: {http_err}"
         except requests.exceptions.RequestException as err:
             return f"Error occurred: {err}"
-        
-    def search_api_by_space(self, space, keyword):
+
+    def search_api_by_space(self, space, keywords):
+        keywords = self._as_keyword_list(keywords)
         try:
-            response = self.r.get(f'{self.url}/rest/api/content/search?cql=space+=+{space}+and+text+~+"{keyword}"&limit=1000', headers=self.headers, proxies=self.proxy, verify=False)
+            response = self.r.get(
+                f'{self.url}/rest/api/content/search',
+                params={"cql": f"space = {space} and {self._build_text_cql(keywords)}", "limit": 1000},
+                headers=self.headers, proxies=self.proxy, verify=False)
             pages = self.create_dict_from_search(response.json())
             return pages
 
         except requests.exceptions.HTTPError as http_err:
             return f"HTTP Error occurred: {http_err}"
         except requests.exceptions.RequestException as err:
-            return f"Error occurred: {err}"       
+            return f"Error occurred: {err}"
         
     def create_dict_from_search(self, data):
         pages = {}
@@ -107,8 +129,8 @@ class ConfluanceApiClient:
             except requests.exceptions.RequestException as err:
                 logging.info(f"Failed to download attachment '{attachment['title']}': {err}")
     
-    def grep_content_page(self, data, keyword, download_dir=None):
-        pattern = rf'^.*(?:{re.escape(keyword)}).*$'
+    def grep_content_page(self, data, keywords, download_dir=None):
+        pattern = self._keyword_pattern(self._as_keyword_list(keywords))
         try:
             #   key, value
             for page_id, page_info in data.items():
@@ -245,8 +267,8 @@ class ConfluanceApiClient:
                     logging.info(f'    {C.RED}x Failed v{version} of \'{name}\': {err}{C.RESET}')
         return count
 
-    def grep_page_history(self, page_id, page_info, keyword, download_dir=None):
-        pattern = rf'^.*(?:{re.escape(keyword)}).*$'
+    def grep_page_history(self, page_id, page_info, keywords, download_dir=None):
+        pattern = self._keyword_pattern(self._as_keyword_list(keywords))
         versions = self.list_page_versions(page_id)
         if not versions:
             return
@@ -275,7 +297,8 @@ class ConfluanceApiClient:
                         self.download_attachment_versions(page_id, page_info, download_dir)
                         attachments_downloaded = True
 
-    def search_history(self, keyword, space=None, download_dir=None):
+    def search_history(self, keywords, space=None, download_dir=None):
+        keywords = self._as_keyword_list(keywords)
         if space:
             pages = self.list_pages_by_space(space)
         else:
@@ -297,9 +320,9 @@ class ConfluanceApiClient:
             os.makedirs(download_dir, exist_ok=True)
             logging.info(f"Downloading history matches to: {os.path.abspath(download_dir)}")
 
-        logging.info(f'\n{C.BOLD}Scanning page history ({len(pages)} pages) for keyword: {keyword}{C.RESET}')
+        logging.info(f'\n{C.BOLD}Scanning page history ({len(pages)} pages) for keywords: {", ".join(keywords)}{C.RESET}')
         for page_id, page_info in pages.items():
-            self.grep_page_history(page_id, page_info, keyword, download_dir=download_dir)
+            self.grep_page_history(page_id, page_info, keywords, download_dir=download_dir)
 
     def list_spaces(self):
         try:
@@ -444,11 +467,12 @@ class ConfluanceApiClient:
 
         logging.info(f'\n  {C.GREEN}Total attachments found: {total}{C.RESET}')
                         
-    def search_keywords_on_pages(self, keyword, space=None, download_dir=None):
+    def search_keywords_on_pages(self, keywords, space=None, download_dir=None):
+        keywords = self._as_keyword_list(keywords)
         if space:
-            pages = self.search_api_by_space(space, keyword)
+            pages = self.search_api_by_space(space, keywords)
         else:
-            pages = self.search_api(keyword)
+            pages = self.search_api(keywords)
 
         if not isinstance(pages, dict):
             logging.info(pages)
@@ -458,6 +482,6 @@ class ConfluanceApiClient:
             os.makedirs(download_dir, exist_ok=True)
             logging.info(f"Downloading keyword matches to: {os.path.abspath(download_dir)}")
 
-        self.grep_content_page(pages, keyword, download_dir=download_dir)
+        self.grep_content_page(pages, keywords, download_dir=download_dir)
         
 

@@ -46,7 +46,7 @@ python3 confugrind.py <baseurl> <token> [options]
 
 - `baseurl`: Base URL of the Confluence instance.
 - `token`: API token for authenticating with the Confluence instance.
-- `--keyword`: Keyword to search within Confluence pages.
+- `--keyword`: Keyword(s) to search within Confluence pages. Comma-separated for multiple; a page matches if it contains **any** of them (OR), e.g. `--keyword password,secret,api_key`.
 - `--space`: Space key to narrow down search or listing.
 - `--ext`: Comma-separated list of file extensions to look for in attachments.
 - `--sa`: Enable searching for attachments based on the specified `--ext`.
@@ -77,6 +77,11 @@ python3 confugrind.py <baseurl> <token> [options]
 - **Search for a keyword across Confluence (includes full page history by default):**
   ```bash
   python3 confugrind.py https://some-confluence.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword password
+  ```
+
+- **Search for multiple keywords at once (matches any):**
+  ```bash
+  python3 confugrind.py https://some-confluence.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword password,secret,api_key
   ```
 
 - **Search the current version only (faster, no history):**

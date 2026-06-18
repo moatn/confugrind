@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Confluance API client/ scraper", formatter_class=RawTextHelpFormatter)
     parser.add_argument("baseurl", help="Baseurl of the Confluance instance")
     parser.add_argument("token", help="Token created for querying the REST api")
-    parser.add_argument("--keyword", help="Keyword to search for")
+    parser.add_argument("--keyword", type=comma_separated_list, help="Keyword(s) to search for. Comma-separated for multiple; a page matches if it contains ANY of them (e.g. 'password,secret,api_key')")
     parser.add_argument("--space", help="Space key")
     parser.add_argument("--ext", type=comma_separated_list, help="comma seperated extensions to look for on pages")
     parser.add_argument("--sa", action="store_true", help="search attachments, keyword is also needed for this param")
@@ -41,6 +41,7 @@ def main():
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --download ./loot
+        python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord,secret,api_key
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --no-history
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --search --keyword wachtwoord --space IT --download ./loot
         python3 confugrind.py https://some-confluance.internal VrS7zg5Et9FJ3AdxR2y3mD6BbNc1XaGpMhVfC8yQwIu9TlEx --sa --ext pdf,docx,txt,kdb
