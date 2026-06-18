@@ -121,14 +121,20 @@ When `--download` or `--output` is used, each page is stored in a dedicated fold
       <attachment files>
 ```
 
-When history scanning is active (the default for `--search`) and `--download` is used, each matching page version is saved as `v<version>.html` inside the page folder instead of `page.html`:
+When history scanning is active (the default for `--search`) and `--download` is used, each matching page version is saved as `v<version>.html`, and **every version of every attachment** on that page is downloaded as `<name>_v<version>.<ext>`:
 
 ```text
 ./loot/
   <page_id>_<page_title>/
     v3.html
     v7.html
+    attachments/
+      config_v1.xml
+      config_v2.xml
+      backup_v1.kdbx
 ```
+
+This catches attachment versions that were later replaced or removed from the live page (e.g. a secret-laden config that was swapped for a sanitized one).
 
 ## Limitations
 - The current implementation does not handle all potential error scenarios

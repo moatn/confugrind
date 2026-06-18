@@ -187,6 +187,54 @@ class ConfluanceApiClient:
             html_file.write(body)
         logging.info(f'    {C.GREEN}[Saved]{C.RESET} {path}')
 
+    def list_attachment_versions(self, page_id):
+        # For each attachment on a page return its title, current version
+        # number and relative download path, so every version can be fetched.
+        try:
+            response = self.r.get(
+                f"{self.url}/rest/api/content/{page_id}/child/attachment?expand=version&limit=1000",
+                headers={**self.headers, "Accept": "application/json"},
+                proxies=self.proxy, verify=False)
+            data = self._json_or_log(response, f"listing attachments for {page_id}")
+            if not data:
+                return []
+            attachments = []
+            for attachment in data.get("results", []):
+                attachments.append({
+                    "title": attachment["title"],
+                    "current_version": attachment.get("version", {}).get("number", 1),
+                    "download": attachment["_links"]["download"],
+                })
+            return attachments
+        except (requests.exceptions.RequestException, KeyError) as err:
+            logging.info(f"Error occurred while listing attachments for {page_id}: {err}")
+            return []
+
+    def download_attachment_versions(self, page_id, page_info, output_dir):
+        attachments = self.list_attachment_versions(page_id)
+        if not attachments:
+            return
+        title = page_info.get("title", page_id)
+        page_folder = os.path.join(output_dir, f"{page_id}_{self.sanitize_filename(title)}")
+        attachments_folder = os.path.join(page_folder, "attachments")
+        os.makedirs(attachments_folder, exist_ok=True)
+
+        for attachment in attachments:
+            name = attachment["title"]
+            base, ext = os.path.splitext(name)
+            #_links.download is a relative path with a query string; keep the
+            # path and swap in the version we want.
+            path_part = attachment["download"].split("?", 1)[0]
+            for version in range(1, attachment["current_version"] + 1):
+                url = f"{self.url}{path_part}?version={version}"
+                safe_name = self.sanitize_filename(f"{base}_v{version}{ext}")
+                dest = self.unique_filepath(attachments_folder, safe_name)
+                try:
+                    self.download_attachment_file(url, dest)
+                    logging.info(f'    {C.GREEN}[Saved]{C.RESET} {dest}')
+                except requests.exceptions.RequestException as err:
+                    logging.info(f'    {C.RED}x Failed v{version} of \'{name}\': {err}{C.RESET}')
+
     def grep_page_history(self, page_id, page_info, keyword, download_dir=None):
         pattern = rf'^.*(?:{re.escape(keyword)}).*$'
         versions = self.list_page_versions(page_id)
@@ -195,6 +243,7 @@ class ConfluanceApiClient:
         current = max(versions)
         title = page_info.get("title", page_id)
         webui = page_info.get("_links", {}).get("webui", "")
+        attachments_downloaded = False
         for version in sorted(versions):
             body = self.get_page_body_at_version(page_id, version, historical=(version != current))
             if body is None:
@@ -211,6 +260,10 @@ class ConfluanceApiClient:
                     logging.info(f'{C.YELLOW}[Hit]{C.RESET}  {match}')
                 if download_dir:
                     self.save_page_version(page_id, page_info, version, body, download_dir)
+                    #download every version of every attachment once per page
+                    if not attachments_downloaded:
+                        self.download_attachment_versions(page_id, page_info, download_dir)
+                        attachments_downloaded = True
 
     def search_history(self, keyword, space=None, download_dir=None):
         if space:
